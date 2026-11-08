@@ -92,7 +92,9 @@ class SmtpDebugView(View):
         return JsonResponse(
             {
                 "settings": email_settings,
-                "connectivity": [_probe_connect(*target) for target in TARGETS],
+                "connectivity": [
+                    _probe_connect(target[1], target[2]) for target in TARGETS
+                ],
             },
             json_dumps_params={"indent": 2},
         )
