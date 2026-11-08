@@ -196,8 +196,14 @@ def _send_otp_email(email: str, code: str, track: str) -> None:
     )
 
 
-def enqueue_otp_email(email: str, code: str, track: str) -> None:
-    """Queue OTP delivery, falling back to synchronous sending if needed."""
+def enqueue_otp_email(email: str, code: str, track: str) -> bool:
+    """Queue OTP delivery, falling back to synchronous sending if needed.
+
+    Returns True when the email was queued on a real worker or sent
+    synchronously, and False when delivery failed. With
+    OTP_RETURN_ON_FAILURE enabled, delivery failures are logged instead of
+    raised so the API response can carry the code to the client.
+    """
     try:
         from accounts.tasks import send_otp_email_task
     except ImportError:
@@ -207,7 +213,7 @@ def enqueue_otp_email(email: str, code: str, track: str) -> None:
     else:
         try:
             send_otp_email_task.delay(email, code, track)
-            return
+            return True
         except Exception:
             logger.exception(
                 "Unable to queue the OTP email; sending it synchronously.",
@@ -219,11 +225,14 @@ def enqueue_otp_email(email: str, code: str, track: str) -> None:
         # Never log the OTP or include provider exception details in the API
         # response. Delivery failures are operational and must be monitored.
         logger.exception("Unable to send OTP email synchronously.")
+        if settings.OTP_RETURN_ON_FAILURE:
+            return False
         if settings.CELERY_TASK_ALWAYS_EAGER:
             # Eager mode is a development convenience: re-raise so delivery
             # failures are visible on the console instead of masking them
             # behind the generic 202 response.
             raise
+    return True
 
 
 def send_password_reset_email(user: User) -> None:
@@ -259,11 +268,14 @@ def send_password_reset_email(user: User) -> None:
         logger.exception("Unable to send password reset email.")
 
 
-def request_onboarding_otp(email: str, track: str, *, request=None) -> None:
+def request_onboarding_otp(email: str, track: str, *, request=None) -> str | None:
     """Create and deliver a fresh onboarding OTP for a supported track.
 
     Existing accounts still receive the same generic response, but no onboarding
     code is sent to them; this prevents account enumeration and nuisance emails.
+
+    Returns the OTP code only when email delivery failed and
+    OTP_RETURN_ON_FAILURE is enabled (demo environments); otherwise None.
     """
     now = timezone.now()
 
@@ -302,7 +314,10 @@ def request_onboarding_otp(email: str, track: str, *, request=None) -> None:
         otp.set_code(code)
         otp.save()
 
-    enqueue_otp_email(email, code, track)
+    delivered = enqueue_otp_email(email, code, track)
+    if not delivered and settings.OTP_RETURN_ON_FAILURE:
+        return code
+    return None
 
 
 def request_student_otp(email: str, *, request=None) -> None:

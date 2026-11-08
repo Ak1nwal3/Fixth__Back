@@ -292,6 +292,15 @@ CELERY_TASK_EAGER_PROPAGATES = os.getenv(
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 
+# Demo safety net: when true and OTP email delivery fails on both delivery
+# paths, the code is included in the API response so the onboarding flow
+# remains usable without email. Enable only for demo environments.
+OTP_RETURN_ON_FAILURE = os.getenv(
+    'OTP_RETURN_ON_FAILURE',
+    'false',
+).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 # Django REST Framework
 # https://www.django-rest-framework.org/api-guide/settings/
 

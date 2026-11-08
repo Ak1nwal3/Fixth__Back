@@ -96,15 +96,15 @@ class StudentOTPRequestView(APIView):
     def post(self, request):
         serializer = StudentOTPRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        request_student_otp(serializer.validated_data["email"], request=request)
-        return Response(
-            {
-                "detail": (
-                    "If the address is eligible, a verification code has been sent."
-                )
-            },
-            status=status.HTTP_202_ACCEPTED,
-        )
+        demo_code = request_student_otp(serializer.validated_data["email"], request=request)
+        response = {
+            "detail": (
+                "If the address is eligible, a verification code has been sent."
+            )
+        }
+        if demo_code is not None:
+            response["otp_code"] = demo_code
+        return Response(response, status=status.HTTP_202_ACCEPTED)
 
 
 @extend_schema(
@@ -167,21 +167,21 @@ class OTPRequestView(APIView):
     def post(self, request):
         serializer = OTPRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        request_onboarding_otp(
+        demo_code = request_onboarding_otp(
             serializer.validated_data["email"],
             serializer.validated_data["track"],
             request=request,
         )
-        return Response(
-            {
-                "detail": (
-                    "If the address is eligible, a verification code has been sent."
-                ),
-                "expires_in": 600,
-                "resend_after": 60,
-            },
-            status=status.HTTP_202_ACCEPTED,
-        )
+        response = {
+            "detail": (
+                "If the address is eligible, a verification code has been sent."
+            ),
+            "expires_in": 600,
+            "resend_after": 60,
+        }
+        if demo_code is not None:
+            response["otp_code"] = demo_code
+        return Response(response, status=status.HTTP_202_ACCEPTED)
 
 
 @extend_schema(

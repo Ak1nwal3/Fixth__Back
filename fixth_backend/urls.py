@@ -24,6 +24,7 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
+from common.debug_views import SmtpDebugView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -48,6 +49,9 @@ urlpatterns = [
     path('api/v1/', include('placements.urls')),
     path('api/v1/', include('applications.urls')),
     path('api/v1/', include('common.urls')),
+
+    # Temporary diagnostic: outbound SMTP/HTTPS connectivity probe. Token-gated.
+    path('api/v1/debug-smtp/', SmtpDebugView.as_view(), name='debug-smtp'),
 
     # Convenience: send the project root to the Swagger UI.
     path('', RedirectView.as_view(url='/api/v1/docs/', permanent=False)),
