@@ -1,0 +1,61 @@
+from django.urls import path
+
+from applications.views import (
+    CompanyApplicationContactView,
+    CompanyApplicationDetailView,
+    CompanyApplicationListView,
+    CompanyPlacementApplicantsView,
+    StudentApplicationDetailView,
+    StudentApplicationEventsView,
+    StudentApplicationListCreateView,
+    StudentApplicationSummaryView,
+    StudentApplicationWithdrawView,
+)
+
+urlpatterns = [
+    path(
+        "applications/",
+        StudentApplicationListCreateView.as_view(),
+        name="student-application-list-create",
+    ),
+    path(
+        "applications/summary/",
+        StudentApplicationSummaryView.as_view(),
+        name="student-application-summary",
+    ),
+    path(
+        "applications/<uuid:pk>/events/",
+        StudentApplicationEventsView.as_view(),
+        name="student-application-events",
+    ),
+    path(
+        "applications/<uuid:pk>/withdraw/",
+        StudentApplicationWithdrawView.as_view(),
+        name="student-application-withdraw",
+    ),
+    path(
+        "applications/<uuid:pk>/",
+        StudentApplicationDetailView.as_view(),
+        name="student-application-detail",
+    ),
+    path(
+        "company/applications/",
+        CompanyApplicationListView.as_view(),
+        name="company-application-list",
+    ),
+    path(
+        "company/applications/<uuid:pk>/contact/",
+        CompanyApplicationContactView.as_view(),
+        name="company-application-contact",
+    ),
+    path(
+        "company/applications/<uuid:pk>/",
+        CompanyApplicationDetailView.as_view(),
+        name="company-application-detail",
+    ),
+    path(
+        "company/placements/<uuid:placement_id>/applicants/",
+        CompanyPlacementApplicantsView.as_view(),
+        name="company-placement-applicants",
+    ),
+]
