@@ -54,12 +54,7 @@ def logo_file(name="logo.png", image_format="PNG"):
     )
 
 
-@override_settings(
-    MEDIA_ROOT=tempfile.mkdtemp(),
-    RESEND_API_KEY="",
-    RESEND_USE_TEST_SENDER=False,
-    EMAIL_REDIRECT_TO="",
-)
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class OrganizationOnboardingTests(APITestCase):
     def setUp(self):
         cache.clear()

@@ -1,10 +1,7 @@
 import ipaddress
-import json
 import logging
 import secrets
 from datetime import timedelta
-from urllib import error as urllib_error
-from urllib import request as urllib_request
 
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
@@ -53,71 +50,6 @@ def client_ip(request) -> str | None:
         return None
 
 
-def _send_resend_email(
-    *,
-    to_email: str,
-    subject: str,
-    text: str,
-    html: str,
-) -> None:
-    """Send one email through Resend's HTTP API."""
-    payload = json.dumps(
-        {
-            "from": settings.RESEND_FROM_EMAIL,
-            "to": [to_email],
-            "subject": subject,
-            "text": text,
-            "html": html,
-        }
-    ).encode("utf-8")
-    request = urllib_request.Request(
-        settings.RESEND_API_URL,
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {settings.RESEND_API_KEY}",
-            "Content-Type": "application/json",
-            "User-Agent": settings.RESEND_USER_AGENT,
-        },
-        method="POST",
-    )
-
-    try:
-        with urllib_request.urlopen(
-            request,
-            timeout=settings.RESEND_TIMEOUT,
-        ) as response:
-            response.read()
-    except urllib_error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")[:500]
-        logger.error(
-            "Resend rejected an email: status=%s body=%s",
-            exc.code,
-            detail,
-        )
-        raise EmailDeliveryError("Resend rejected the email.") from exc
-    except (urllib_error.URLError, OSError) as exc:
-        logger.error(
-            "Resend request failed: %s",
-            exc.__class__.__name__,
-        )
-        raise EmailDeliveryError("Resend request failed.") from exc
-
-
-def _delivery_recipient(to_email: str) -> str:
-    """Redirect local test mail to the Resend account owner."""
-    if not settings.RESEND_USE_TEST_SENDER:
-        return to_email
-
-    if not settings.EMAIL_REDIRECT_TO:
-        logger.warning(
-            "RESEND_USE_TEST_SENDER is enabled without EMAIL_REDIRECT_TO. "
-            "Resend will reject recipients other than the account owner.",
-        )
-        return to_email
-
-    return settings.EMAIL_REDIRECT_TO
-
-
 def _send_transactional_email(
     *,
     to_email: str,
@@ -125,40 +57,13 @@ def _send_transactional_email(
     text: str,
     html: str,
 ) -> None:
-    """Send through Resend when configured, otherwise through Django SMTP.
-
-    The Django path honors EMAIL_BACKEND/EMAIL_* settings: the console backend
-    locally (default) or a real SMTP relay such as Gmail when configured.
-    """
-    recipient = _delivery_recipient(to_email)
-    if recipient != to_email:
-        subject = f"[TEST: {to_email}] {subject}"
-        text = (
-            f"{text}\n\n"
-            f"[Local test redirect: originally addressed to {to_email}]"
-        )
-        html = (
-            f"{html}"
-            '<p style="color:#888;font-size:12px">'
-            f"Local test redirect: originally addressed to {escape(to_email)}"
-            "</p>"
-        )
-
-    if settings.RESEND_API_KEY:
-        _send_resend_email(
-            to_email=recipient,
-            subject=subject,
-            text=text,
-            html=html,
-        )
-        return
-
+    """Send one transactional email through Django's SMTP mailer."""
     try:
         send_mail(
             subject=subject,
             message=text,
-            from_email=None,
-            recipient_list=[recipient],
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[to_email],
             html_message=html,
             fail_silently=False,
         )

@@ -1,4 +1,3 @@
-import json
 import re
 from datetime import timedelta
 from unittest.mock import patch
@@ -85,11 +84,6 @@ class StudentEmailValidationTests(APITestCase):
                     field.run_validation(raw)
 
 
-@override_settings(
-    RESEND_API_KEY="",
-    RESEND_USE_TEST_SENDER=False,
-    EMAIL_REDIRECT_TO="",
-)
 class StudentOTPTests(APITestCase):
     def setUp(self):
         cache.clear()
@@ -205,71 +199,43 @@ class StudentOTPTests(APITestCase):
                 self.assertEqual(response.status_code, 400)
 
 
-class OTPEmailDeliveryTests(SimpleTestCase):
+class EmailDeliveryTests(SimpleTestCase):
     @override_settings(
-        RESEND_API_KEY="re_test",
-        RESEND_API_URL="https://api.resend.com/emails",
-        RESEND_FROM_EMAIL="Fixth <no-reply@example.com>",
-        RESEND_TIMEOUT=5,
-        RESEND_USE_TEST_SENDER=False,
-        EMAIL_REDIRECT_TO="",
+        DEFAULT_FROM_EMAIL="Fixth <otp@send.getfixth.com>",
     )
-    def test_resend_payload_contains_code_and_recipient(self):
-        with patch("accounts.services.urllib_request.urlopen") as mocked:
-            response = mocked.return_value.__enter__.return_value
-            response.read.return_value = b'{"id":"email_123"}'
-
-            services._send_otp_email(
-                "student@university.edu.ng",
-                "123456",
-                OTPCode.Track.STUDENT,
+    def test_transactional_email_uses_html_and_recipient(self):
+        with patch("accounts.services.send_mail") as mocked:
+            services._send_transactional_email(
+                to_email="student@university.edu.ng",
+                subject="Test subject",
+                text="Test body",
+                html="<p>Test body</p>",
             )
 
-        request = mocked.call_args.args[0]
-        payload = json.loads(request.data.decode("utf-8"))
-        self.assertEqual(payload["to"], ["student@university.edu.ng"])
-        self.assertEqual(payload["from"], "Fixth <no-reply@example.com>")
-        self.assertIn("123456", payload["text"])
-        self.assertIn("123456", payload["html"])
-        self.assertEqual(request.get_header("Authorization"), "Bearer re_test")
-        self.assertEqual(request.full_url, "https://api.resend.com/emails")
-        self.assertEqual(request.get_header("User-agent"), "Fixth-Backend/1.0")
-
-    @override_settings(
-        RESEND_API_KEY="re_test",
-        RESEND_API_URL="https://api.resend.com/emails",
-        RESEND_FROM_EMAIL="Fixth <onboarding@resend.dev>",
-        RESEND_TIMEOUT=5,
-        RESEND_USE_TEST_SENDER=True,
-        EMAIL_REDIRECT_TO="owner@example.com",
-    )
-    def test_test_sender_redirects_email_to_the_resend_owner(self):
-        with patch("accounts.services.urllib_request.urlopen") as mocked:
-            response = mocked.return_value.__enter__.return_value
-            response.read.return_value = b'{"id":"email_123"}'
-
-            services._send_otp_email(
-                "student@university.edu.ng",
-                "123456",
-                OTPCode.Track.STUDENT,
-            )
-
-        request = mocked.call_args.args[0]
-        payload = json.loads(request.data.decode("utf-8"))
-        self.assertEqual(payload["to"], ["owner@example.com"])
-        self.assertEqual(payload["from"], "Fixth <onboarding@resend.dev>")
-        self.assertIn("[TEST: student@university.edu.ng]", payload["subject"])
-        self.assertIn("student@university.edu.ng", payload["text"])
-
-    @override_settings(
-        RESEND_USE_TEST_SENDER=False,
-        EMAIL_REDIRECT_TO="owner@example.com",
-    )
-    def test_redirect_is_ignored_when_test_sender_is_disabled(self):
         self.assertEqual(
-            services._delivery_recipient("student@university.edu.ng"),
-            "student@university.edu.ng",
+            mocked.call_args.kwargs["from_email"],
+            "Fixth <otp@send.getfixth.com>",
         )
+        self.assertEqual(
+            mocked.call_args.kwargs["recipient_list"],
+            ["student@university.edu.ng"],
+        )
+        self.assertEqual(mocked.call_args.kwargs["subject"], "Test subject")
+        self.assertIn("Test body", mocked.call_args.kwargs["message"])
+        self.assertIn("Test body", mocked.call_args.kwargs["html_message"])
+
+    def test_transactional_email_failure_raises(self):
+        with patch(
+            "accounts.services.send_mail",
+            side_effect=Exception("smtp unavailable"),
+        ):
+            with self.assertRaises(services.EmailDeliveryError):
+                services._send_transactional_email(
+                    to_email="student@university.edu.ng",
+                    subject="Test subject",
+                    text="Test body",
+                    html="<p>Test body</p>",
+                )
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
     def test_enqueue_uses_celery_before_synchronous_fallback(self):
@@ -287,11 +253,6 @@ class OTPEmailDeliveryTests(SimpleTestCase):
         )
 
 
-@override_settings(
-    RESEND_API_KEY="",
-    RESEND_USE_TEST_SENDER=False,
-    EMAIL_REDIRECT_TO="",
-)
 class StudentOnboardingCompleteTests(APITestCase):
     def setUp(self):
         cache.clear()
@@ -420,11 +381,6 @@ class StudentOnboardingCompleteTests(APITestCase):
         self.assertIsNone(otp.consumed_at)
 
 
-@override_settings(
-    RESEND_API_KEY="",
-    RESEND_USE_TEST_SENDER=False,
-    EMAIL_REDIRECT_TO="",
-)
 class AuthAndProfileTests(APITestCase):
     def setUp(self):
         cache.clear()

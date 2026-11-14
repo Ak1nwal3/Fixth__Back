@@ -214,15 +214,17 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 #
-# Delivery path: accounts.services._send_transactional_email() uses Resend's
-# HTTP API when RESEND_API_KEY is set, and otherwise falls back to Django's
-# send_mail(), which uses these SMTP settings. The default backend is the
-# console mailer so local development without SMTP configuration prints
-# emails instead of trying to connect to localhost:25.
+# Transactional email uses Django's standard SMTP settings. SendByte SMTP uses
+# `EMAIL_HOST_USER=apikey` and the SendByte API key as the password.
+# When EMAIL_HOST is unset, the console mailer is a local-development fallback.
 
 EMAIL_BACKEND = os.getenv(
     'EMAIL_BACKEND',
-    'django.core.mail.backends.console.EmailBackend',
+    (
+        'django.core.mail.backends.smtp.EmailBackend'
+        if os.getenv('EMAIL_HOST', '')
+        else 'django.core.mail.backends.console.EmailBackend'
+    ),
 )
 EMAIL_HOST = os.getenv('EMAIL_HOST', '')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
@@ -235,35 +237,6 @@ DEFAULT_FROM_EMAIL = os.getenv(
     'DEFAULT_FROM_EMAIL',
     'Fixth <no-reply@auth.fixth.ng>',
 )
-
-
-# Transactional email delivery via Resend.
-# The console mailer above remains the local fallback when no API key is
-# configured.
-RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
-RESEND_API_URL = os.getenv('RESEND_API_URL', 'https://api.resend.com/emails')
-RESEND_FROM_EMAIL = os.getenv(
-    'RESEND_FROM_EMAIL',
-    'Fixth <no-reply@auth.fixth.ng>',
-)
-RESEND_TIMEOUT = int(os.getenv('RESEND_TIMEOUT', '10'))
-RESEND_USER_AGENT = os.getenv('RESEND_USER_AGENT', 'Fixth-Backend/1.0')
-
-# Local-only shortcut: Resend's test sender can only deliver to the email
-# address attached to the Resend account. When enabled, every transactional
-# email is redirected to EMAIL_REDIRECT_TO and sent from RESEND_TEST_FROM_EMAIL.
-RESEND_USE_TEST_SENDER = os.getenv(
-    'RESEND_USE_TEST_SENDER',
-    'false',
-).strip().lower() in {'1', 'true', 'yes', 'on'}
-RESEND_TEST_FROM_EMAIL = os.getenv(
-    'RESEND_TEST_FROM_EMAIL',
-    'Fixth <onboarding@resend.dev>',
-)
-EMAIL_REDIRECT_TO = os.getenv('EMAIL_REDIRECT_TO', '').strip()
-
-if RESEND_USE_TEST_SENDER:
-    RESEND_FROM_EMAIL = RESEND_TEST_FROM_EMAIL
 
 
 # Background jobs (Celery / Redis).

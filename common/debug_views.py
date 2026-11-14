@@ -21,12 +21,9 @@ SMTP_TOKEN = os.getenv("DEBUG_SMTP_TOKEN", "fixth-smtp-probe-8217")
 
 TARGETS = [
     ("configured EMAIL_HOST", settings.EMAIL_HOST, settings.EMAIL_PORT),
-    ("gmail submission SSL", "smtp.gmail.com", 465),
-    ("gmail submission TLS", "smtp.gmail.com", 587),
-    ("outlook TLS", "smtp-mail.outlook.com", 587),
-    ("sendgrid TLS", "smtp.sendgrid.net", 587),
-    ("resend https baseline", "api.resend.com", 443),
-    ("brevo https baseline", "api.brevo.com", 443),
+    ("SendByte SMTP TLS", "smtp.sendbyte.africa", 587),
+    ("SendByte SMTP SSL", "smtp.sendbyte.africa", 465),
+    ("SendByte SMTP alternate TLS", "smtp.sendbyte.africa", 2525),
 ]
 
 
@@ -85,8 +82,6 @@ class SmtpDebugView(View):
             "EMAIL_HOST_USER": _mask(settings.EMAIL_HOST_USER),
             "EMAIL_HOST_PASSWORD": "set" if settings.EMAIL_HOST_PASSWORD else "UNSET",
             "DEFAULT_FROM_EMAIL": settings.DEFAULT_FROM_EMAIL,
-            "RESEND_API_KEY": "set" if settings.RESEND_API_KEY else "UNSET",
-            "RESEND_FROM_EMAIL": settings.RESEND_FROM_EMAIL,
         }
 
         return JsonResponse(
